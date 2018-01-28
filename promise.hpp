@@ -177,7 +177,7 @@ namespace promise {
                         gen_on_fulfilled(on_fulfilled, npm)();
                     });
                 case State::Rejected:
-                    return promise_t([](promise_t npm) {});
+                    return promise_t([this](promise_t npm) {npm.reject(reason);});
                 default: PROMISE_ERR_INVALID_STATE;
             }
         }
@@ -192,7 +192,7 @@ namespace promise {
                         add_on_fulfilled([this, npm]() {npm.resolve(result);});
                     });
                 case State::Fulfilled:
-                    return promise_t([](promise_t npm) {});
+                    return promise_t([this](promise_t npm) {npm.resolve(result);});
                 case State::Rejected:
                     return promise_t([this, on_rejected](promise_t npm) {
                         add_on_rejected(gen_on_rejected(on_rejected, npm));
