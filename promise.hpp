@@ -52,8 +52,10 @@ namespace promise {
 #define PROMISE_ERR_MISMATCH_TYPE do {throw std::runtime_error("mismatching promise value types");} while (0)
     
     class Promise {
-        function<void()> fulfilled_callback;
-        function<void()> rejected_callback;
+        //function<void()> fulfilled_callback;
+        //function<void()> rejected_callback;
+        std::vector<function<void()>> fulfilled_callbacks;
+        std::vector<function<void()>> rejected_callbacks;
         enum class State {
             Pending,
             Fulfilled,
@@ -62,6 +64,8 @@ namespace promise {
         pm_any_t result;
         pm_any_t reason;
 
+        /* this implementation causes stack overflow because of the nested lambdas */
+        /*
         void add_on_fulfilled(function<void()> cb) {
             auto old_cbs = fulfilled_callback;
             fulfilled_callback = function<void()>(
@@ -78,6 +82,15 @@ namespace promise {
                     old_cbs();
                     cb();
                 });
+        }
+        */
+
+        void add_on_fulfilled(function<void()> cb) {
+            fulfilled_callbacks.push_back(cb);
+        }
+
+        void add_on_rejected(function<void()> cb) {
+            rejected_callbacks.push_back(cb);
         }
 
         function<void()> gen_on_fulfilled(
@@ -131,8 +144,10 @@ namespace promise {
         public:
 
         Promise():
+            /*
             fulfilled_callback(do_nothing),
             rejected_callback(do_nothing),
+            */
             state(State::Pending) {
             //printf("%lx constructed\n", (uintptr_t)this);
         }
@@ -207,7 +222,8 @@ namespace promise {
                 case State::Pending:
                     result = _result;
                     state = State::Fulfilled;
-                    fulfilled_callback();
+                    //fulfilled_callback();
+                    for (const auto &cb: fulfilled_callbacks) cb();
                     break;
                 default:
                     break;
@@ -220,7 +236,8 @@ namespace promise {
                 case State::Pending:
                     reason = _reason;
                     state = State::Rejected;
-                    rejected_callback();
+                    //rejected_callback();
+                    for (const auto &cb: rejected_callbacks) cb();
                     break;
                 default:
                     break;
