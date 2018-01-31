@@ -12,25 +12,26 @@ int main() {
         puts("pm1");
         //t1 = [pm]() {pm.reject(5);};
         t1 = [pm]() {pm.resolve(5);};
-    }).then(std::function<int(int)>([](int x) {
+    }).then([](int x) {
         printf("%d\n", x);
         return 6;
-    })).then(std::function<int(int)>([](int y) {
+    }).then([](int y) {
         printf("%d\n", y);
         return 0;
-    })).then(std::function<promise_t(int)>([&t2](int x) {
+    }).then([&t2](int x) {
         auto pm2 = promise_t([x, &t2](promise_t pm2) {
             printf("pm2 %d\n", x);
             t2 = [pm2]() {pm2.resolve(std::string("hello"));};
         });
         return pm2;
-    })).then(std::function<int(std::string)>([](std::string s) {
+    }).then([](std::string s) {
         printf("%s\n", s.c_str());
         return 10;
-    })).then(std::function<promise::None(int)>([](int x) {
+    }).then([](int x) {
         printf("%d\n", x);
         return promise::none;
-    }));
+    });
+    
     auto p1 = promise_t([&t4](promise_t pm) {
         puts("p1");
         t4 = [pm]() {pm.resolve(1);};
@@ -47,25 +48,22 @@ int main() {
     });
 
     auto p4 = promise::all(std::vector<promise_t>{p1, p2, p3})
-        .then(std::function<int(promise::values_t)>(
-            [](const promise::values_t values) {
+        .then([](const promise::values_t values) {
             printf("%d %s %s\n", std::any_cast<int>(values[0]),
                                 std::any_cast<std::string>(values[1]).c_str(),
                                 std::any_cast<std::string>(values[2]).c_str());
-        return 100;
-    }));
+            return 100;
+        });
 
     auto p5 = promise::all(std::vector<promise_t>{pm, p4})
-        .fail(std::function<int(int)>(
-            [](int reason) {
-                printf("reason: %d\n", reason);
-                return reason;
-        }))
-        .then(std::function<promise::None(promise::values_t)>(
-            [](const promise::values_t values) {
-                printf("finally %d\n", std::any_cast<int>(values[1]));
-                return promise::none;
-        }));
+        .fail([](int reason) {
+            printf("reason: %d\n", reason);
+            return reason;
+        })
+        .then([](const promise::values_t values) {
+            printf("finally %d\n", std::any_cast<int>(values[1]));
+            return promise::none;
+        });
     puts("calling t");
     t4();
     puts("calling t2");
