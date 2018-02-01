@@ -6,17 +6,6 @@
 #include <any>
 #include <functional>
 
-template <typename T>
-struct function_traits:
-    public function_traits<decltype(&T::operator())> {};
-
-template <typename ClassType, typename ReturnType, typename ArgType>
-struct function_traits<ReturnType(ClassType::*)(ArgType) const>
-{
-    using ret_type = ReturnType;
-    using arg_type = ArgType;
-};
-
 /** Implement type-safe Promise primitives similar to the ones specified by
  * Javascript A+. */
 namespace promise {
@@ -26,6 +15,33 @@ namespace promise {
     using values_t = std::vector<pm_any_t>;
     const auto none = nullptr;
     const auto do_nothing = [](){};
+
+    /* match lambdas */
+    template<typename T>
+    struct function_traits:
+        public function_traits<decltype(&T::operator())> {};
+    
+    /* match plain functions */
+    template<typename ReturnType, typename ArgType>
+    struct function_traits<ReturnType(ArgType)> {
+        using ret_type = ReturnType;
+        using arg_type = ArgType;
+    };
+  
+    /* match function pointers */
+    template<typename ReturnType, typename ArgType>
+    struct function_traits<ReturnType(*)(ArgType)>:
+        public function_traits<ReturnType(ArgType)> {};
+
+    /* match const member functions */
+    template<typename ClassType, typename ReturnType, typename ArgType>
+    struct function_traits<ReturnType(ClassType::*)(ArgType) const>:
+        public function_traits<ReturnType(ArgType)> {};
+
+    /* match member functions */
+    template<typename ClassType, typename ReturnType, typename ArgType>
+    struct function_traits<ReturnType(ClassType::*)(ArgType)>:
+        public function_traits<ReturnType(ArgType)> {};
 
     class Promise;
     class promise_t {
@@ -285,11 +301,11 @@ namespace promise {
     };
         
     template<typename PList> promise_t all(PList promise_list) {
-        auto size = std::make_shared<size_t>(promise_list.size());
-        auto results = std::make_shared<values_t>();
-        if (!size) PROMISE_ERR_MISMATCH_TYPE;
-        results->resize(*size);
-        return promise_t([=] (promise_t npm) {
+        return promise_t([promise_list] (promise_t npm) {
+            auto size = std::make_shared<size_t>(promise_list.size());
+            auto results = std::make_shared<values_t>();
+            if (!size) PROMISE_ERR_MISMATCH_TYPE;
+            results->resize(*size);
             size_t idx = 0;
             for (const auto &pm: promise_list) {
                 pm.then_any(

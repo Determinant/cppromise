@@ -2,12 +2,25 @@
 #include "promise.hpp"
 using promise::promise_t;
 
+struct A {
+    promise::None operator()(int y) const {
+        printf("%d\n", y);
+        return promise::none;
+    }
+};
+
+int f(int x) {
+    printf("%d\n", x);
+    return x + 1;
+}
+
 int main() {
     std::function<void()> t1;
     std::function<void()> t2;
     std::function<void()> t3;
     std::function<void()> t4;
     std::function<void()> t5;
+    A a;
     auto pm = promise_t([&t1](promise_t pm) {
         puts("pm1");
         //t1 = [pm]() {pm.reject(5);};
@@ -29,8 +42,8 @@ int main() {
         return 10;
     }).then([](int x) {
         printf("%d\n", x);
-        return promise::none;
-    });
+        return 12;
+    }).then(f).then(a);
     
     auto p1 = promise_t([&t4](promise_t pm) {
         puts("p1");
