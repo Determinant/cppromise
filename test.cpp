@@ -3,9 +3,16 @@
 using promise::promise_t;
 
 struct A {
-    promise::None operator()(int y) const {
-        printf("%d\n", y);
-        return promise::none;
+    int operator()(int x) {
+        printf("%d\n", x);
+        return 1;
+    }
+};
+
+struct B {
+    promise_t operator()(int x) {
+        printf("%d\n", x);
+        return promise_t([](promise_t pm) {pm.resolve(1);});
     }
 };
 
@@ -14,13 +21,19 @@ int f(int x) {
     return x + 1;
 }
 
+promise_t g(int x) {
+    printf("%d\n", x);
+    return promise_t([](promise_t pm) {pm.resolve(1);});
+}
+
 int main() {
     std::function<void()> t1;
     std::function<void()> t2;
     std::function<void()> t3;
     std::function<void()> t4;
     std::function<void()> t5;
-    A a;
+    A a1, a2, a3;
+    B b1, b2, b3;
     auto pm = promise_t([&t1](promise_t pm) {
         puts("pm1");
         //t1 = [pm]() {pm.reject(5);};
@@ -43,7 +56,7 @@ int main() {
     }).then([](int x) {
         printf("%d\n", x);
         return 12;
-    }).then(f).then(a);
+    }).then(f).then(a1).fail(a2).then(b1).fail(b2).then(g).then(a3, b3);
     
     auto p1 = promise_t([&t4](promise_t pm) {
         puts("p1");

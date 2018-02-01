@@ -128,7 +128,7 @@ namespace promise {
             std::is_same<typename function_traits<Func>::ret_type,
                          promise_t>::value>::type
         gen_on_fulfilled(Func on_fulfilled, const promise_t &npm, function<void()> &ret) {
-            ret = [this, on_fulfilled, npm]() {
+            ret = [this, on_fulfilled, npm]() mutable {
                 on_fulfilled(result).then_any(
                     [npm] (pm_any_t result_) {
                         npm.resolve(result_);
@@ -146,7 +146,7 @@ namespace promise {
             std::is_same<typename function_traits<Func>::ret_type,
                          pm_any_t>::value>::type
         gen_on_fulfilled(Func on_fulfilled, const promise_t &npm, function<void()> &ret) {
-            ret = [this, on_fulfilled, npm]() {
+            ret = [this, on_fulfilled, npm]() mutable {
                 npm.resolve(on_fulfilled(result));
             };
         }
@@ -156,15 +156,15 @@ namespace promise {
             std::is_same<typename function_traits<Func>::ret_type,
                          promise_t>::value>::type
         gen_on_rejected(Func on_rejected, const promise_t &npm, function<void()> &ret) {
-            ret = [this, on_rejected, npm]() {
+            ret = [this, on_rejected, npm]() mutable {
                 on_rejected(reason).then_any(
                     [npm] (pm_any_t result_) {
                         npm.resolve(result_);
-                        return none;
+                        return pm_any_t(none);
                     },
                     [npm] (pm_any_t reason_) {
                         npm.reject(reason_);
-                        return none;
+                        return pm_any_t(none);
                     });
             };
         }
@@ -174,7 +174,7 @@ namespace promise {
             std::is_same<typename function_traits<Func>::ret_type,
                          pm_any_t>::value>::type
         gen_on_rejected(Func on_rejected, const promise_t &npm, function<void()> &ret) {
-            ret = [this, on_rejected, npm]() {
+            ret = [this, on_rejected, npm]() mutable {
                 npm.reject(on_rejected(reason));
             };
         }
@@ -367,7 +367,7 @@ namespace promise {
         using arg_type = typename callback_types<FuncFulfilled>::arg_type;
         using ret_type = typename callback_types<FuncFulfilled>::ret_type;
         return ptr->then(
-            [on_fulfilled](pm_any_t _result) {
+            [on_fulfilled](pm_any_t _result) mutable {
                 try {
                     return ret_type(on_fulfilled(std::any_cast<arg_type>(_result)));
                 } catch (std::bad_any_cast e) { PROMISE_ERR_MISMATCH_TYPE; }
@@ -382,12 +382,12 @@ namespace promise {
         using reject_arg_type = typename callback_types<FuncRejected>::arg_type;
         using reject_ret_type = typename callback_types<FuncRejected>::ret_type;
         return ptr->then(
-            [on_fulfilled](pm_any_t _result) {
+            [on_fulfilled](pm_any_t _result) mutable {
                 try {
                     return fulfill_ret_type(on_fulfilled(std::any_cast<fulfill_arg_type>(_result)));
                 } catch (std::bad_any_cast e) { PROMISE_ERR_MISMATCH_TYPE; }
             },
-            [on_rejected](pm_any_t _reason) {
+            [on_rejected](pm_any_t _reason) mutable {
                 try {
                     return reject_ret_type(on_rejected(std::any_cast<reject_arg_type>(_reason)));
                 } catch (std::bad_any_cast e) { PROMISE_ERR_MISMATCH_TYPE; }
@@ -399,7 +399,7 @@ namespace promise {
         using arg_type = typename callback_types<FuncRejected>::arg_type;
         using ret_type = typename callback_types<FuncRejected>::ret_type;
         return ptr->fail(
-            [on_rejected](pm_any_t _reason) {
+            [on_rejected](pm_any_t _reason) mutable {
                 try {
                     return ret_type(on_rejected(std::any_cast<arg_type>(_reason)));
                 } catch (std::bad_any_cast e) { PROMISE_ERR_MISMATCH_TYPE; }
