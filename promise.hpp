@@ -1,16 +1,61 @@
 #ifndef _CPPROMISE_HPP
 #define _CPPROMISE_HPP
 
+/**
+ * MIT License
+ * Copyright (c) 2018 Ted Yin <tederminant@gmail.com>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #include <vector>
 #include <memory>
-#include <any>
 #include <functional>
 
-/** Implement type-safe Promise primitives similar to the ones specified by
- * Javascript A+. */
+#if __has_include("any")
+#include <any>
+#endif
+
+#if !defined(__cpp_lib_any)
+#include <boost/any.hpp>
+#endif
+
+/**
+ * Implement type-safe Promise primitives similar to the ones specified by
+ * Javascript Promise/A+.
+ */
 namespace promise {
     using std::function;
+
+#if defined(__cpp_lib_any)
     using pm_any_t = std::any;
+    template<typename T>
+    constexpr auto any_cast = static_cast<T(*)(const std::any&)>(std::any_cast<T>);
+    using bad_any_cast = std::bad_any_cast;
+#else
+#warning "using any type from boost"
+    using pm_any_t = boost::any;
+    template<typename T>
+    constexpr auto any_cast = static_cast<T(*)(const boost::any&)>(boost::any_cast<T>);
+    using bad_any_cast = boost::bad_any_cast;
+#endif
+
     using None = std::nullptr_t;
     using values_t = std::vector<pm_any_t>;
     const auto none = nullptr;
@@ -82,8 +127,6 @@ namespace promise {
 #define PROMISE_ERR_MISMATCH_TYPE do {throw std::runtime_error("mismatching promise value types");} while (0)
     
     class Promise {
-        //function<void()> fulfilled_callback;
-        //function<void()> rejected_callback;
         std::vector<function<void()>> fulfilled_callbacks;
         std::vector<function<void()>> rejected_callbacks;
         enum class State {
@@ -93,27 +136,6 @@ namespace promise {
         } state;
         pm_any_t result;
         pm_any_t reason;
-
-        /* this implementation causes stack overflow because of the nested lambdas */
-        /*
-        void add_on_fulfilled(function<void()> cb) {
-            auto old_cbs = fulfilled_callback;
-            fulfilled_callback = function<void()>(
-                [cb, old_cbs]() {
-                    old_cbs();
-                    cb();
-                });
-        }
-
-        void add_on_rejected(function<void()> cb) {
-            auto old_cbs = rejected_callback;
-            rejected_callback = function<void()>(
-                [cb, old_cbs]() {
-                    old_cbs();
-                    cb();
-                });
-        }
-        */
 
         void add_on_fulfilled(function<void()> cb) {
             fulfilled_callbacks.push_back(cb);
@@ -181,18 +203,8 @@ namespace promise {
 
         public:
 
-        Promise():
-            /*
-            fulfilled_callback(do_nothing),
-            rejected_callback(do_nothing),
-            */
-            state(State::Pending) {
-            //printf("%lx constructed\n", (uintptr_t)this);
-        }
-
-        ~Promise() {
-            //printf("%lx freed\n", (uintptr_t)this);
-        }
+        Promise(): state(State::Pending) {}
+        ~Promise() {}
 
         template<typename FuncFulfilled, typename FuncRejected>
         promise_t then(FuncFulfilled on_fulfilled,
@@ -275,7 +287,6 @@ namespace promise {
                 case State::Pending:
                     result = _result;
                     state = State::Fulfilled;
-                    //fulfilled_callback();
                     for (const auto &cb: fulfilled_callbacks) cb();
                     rejected_callbacks.clear();
                     break;
@@ -290,7 +301,6 @@ namespace promise {
                 case State::Pending:
                     reason = _reason;
                     state = State::Rejected;
-                    //rejected_callback();
                     for (const auto &cb: rejected_callbacks) cb();
                     rejected_callbacks.clear();
                     break;
@@ -369,8 +379,8 @@ namespace promise {
         return ptr->then(
             [on_fulfilled](pm_any_t _result) mutable {
                 try {
-                    return ret_type(on_fulfilled(std::any_cast<arg_type>(_result)));
-                } catch (std::bad_any_cast e) { PROMISE_ERR_MISMATCH_TYPE; }
+                    return ret_type(on_fulfilled(any_cast<arg_type>(_result)));
+                } catch (bad_any_cast e) { PROMISE_ERR_MISMATCH_TYPE; }
             });
     }
 
@@ -384,13 +394,13 @@ namespace promise {
         return ptr->then(
             [on_fulfilled](pm_any_t _result) mutable {
                 try {
-                    return fulfill_ret_type(on_fulfilled(std::any_cast<fulfill_arg_type>(_result)));
-                } catch (std::bad_any_cast e) { PROMISE_ERR_MISMATCH_TYPE; }
+                    return fulfill_ret_type(on_fulfilled(any_cast<fulfill_arg_type>(_result)));
+                } catch (bad_any_cast e) { PROMISE_ERR_MISMATCH_TYPE; }
             },
             [on_rejected](pm_any_t _reason) mutable {
                 try {
-                    return reject_ret_type(on_rejected(std::any_cast<reject_arg_type>(_reason)));
-                } catch (std::bad_any_cast e) { PROMISE_ERR_MISMATCH_TYPE; }
+                    return reject_ret_type(on_rejected(any_cast<reject_arg_type>(_reason)));
+                } catch (bad_any_cast e) { PROMISE_ERR_MISMATCH_TYPE; }
             });
     }
 
@@ -401,9 +411,10 @@ namespace promise {
         return ptr->fail(
             [on_rejected](pm_any_t _reason) mutable {
                 try {
-                    return ret_type(on_rejected(std::any_cast<arg_type>(_reason)));
-                } catch (std::bad_any_cast e) { PROMISE_ERR_MISMATCH_TYPE; }
+                    return ret_type(on_rejected(any_cast<arg_type>(_reason)));
+                } catch (bad_any_cast e) { PROMISE_ERR_MISMATCH_TYPE; }
             });
     }
 }
+
 #endif

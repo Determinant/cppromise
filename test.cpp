@@ -1,6 +1,7 @@
 #include <string>
 #include "promise.hpp"
 using promise::promise_t;
+using promise::any_cast;
 
 struct A {
     int operator()(int x) {
@@ -75,9 +76,9 @@ int main() {
 
     auto p4 = promise::all(std::vector<promise_t>{p1, p2, p3})
         .then([](const promise::values_t values) {
-            printf("%d %s %s\n", std::any_cast<int>(values[0]),
-                                std::any_cast<std::string>(values[1]).c_str(),
-                                std::any_cast<std::string>(values[2]).c_str());
+            printf("%d %s %s\n", any_cast<int>(values[0]),
+                                any_cast<std::string>(values[1]).c_str(),
+                                any_cast<std::string>(values[2]).c_str());
             return 100;
         });
 
@@ -87,7 +88,7 @@ int main() {
             return reason;
         })
         .then([](const promise::values_t values) {
-            printf("finally %d\n", std::any_cast<int>(values[1]));
+            printf("finally %d\n", any_cast<int>(values[1]));
             return promise::none;
         });
     puts("calling t");
