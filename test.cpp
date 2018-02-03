@@ -59,9 +59,12 @@ int main() {
         return 12;
     }).then(f).then(a1).fail(a2).then(b1).fail(b2).then(g).then(a3, b3)
     .then([](int x) {
-        puts("void return will automatically yield promise::none");
+        puts("void return is ok");
     }).then([]() {
-        puts("void parameter will automatically be promise::None");
+        puts("void parameter is ok");
+        return 1;
+    }).then([]() {
+        puts("void parameter will ignore the returned value");
     });
     
     auto p1 = promise_t([&t4](promise_t pm) {
@@ -94,7 +97,6 @@ int main() {
         })
         .then([](const promise::values_t values) {
             printf("finally %d\n", any_cast<int>(values[1]));
-            return promise::none;
         });
     puts("calling t");
     t4();
