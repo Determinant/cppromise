@@ -57,7 +57,12 @@ int main() {
     }).then([](int x) {
         printf("%d\n", x);
         return 12;
-    }).then(f).then(a1).fail(a2).then(b1).fail(b2).then(g).then(a3, b3);
+    }).then(f).then(a1).fail(a2).then(b1).fail(b2).then(g).then(a3, b3)
+    .then([](int x) {
+        puts("void return will automatically yield promise::none");
+    }).then([]() {
+        puts("void parameter will automatically be promise::None");
+    });
     
     auto p1 = promise_t([&t4](promise_t pm) {
         puts("p1");

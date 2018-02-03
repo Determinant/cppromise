@@ -41,8 +41,6 @@
  * Javascript Promise/A+.
  */
 namespace promise {
-    using std::function;
-
 #if defined(__cpp_lib_any)
     using pm_any_t = std::any;
     template<typename T>
@@ -55,62 +53,59 @@ namespace promise {
     constexpr auto any_cast = static_cast<T(*)(const boost::any&)>(boost::any_cast<T>);
     using bad_any_cast = boost::bad_any_cast;
 #endif
-
     struct None {};
-    using values_t = std::vector<pm_any_t>;
     const auto none = None();
-    const auto do_nothing = [](){};
+    using callback_t = std::function<void()>;
+    using values_t = std::vector<pm_any_t>;
 
     /* match lambdas */
     template<typename T>
     struct function_traits:
         public function_traits<decltype(&T::operator())> {};
-    
+ 
+    template<typename ReturnType>
+    struct function_traits<ReturnType()> {
+        using ret_type = ReturnType;
+        using arg_type = None;
+        using empty_arg = void;
+    };
+   
     /* match plain functions */
     template<typename ReturnType, typename ArgType>
     struct function_traits<ReturnType(ArgType)> {
         using ret_type = ReturnType;
         using arg_type = ArgType;
+        using non_empty_arg = void;
     };
-  
+ 
     /* match function pointers */
-    template<typename ReturnType, typename ArgType>
-    struct function_traits<ReturnType(*)(ArgType)>:
-        public function_traits<ReturnType(ArgType)> {};
+    template<typename ReturnType, typename... ArgType>
+    struct function_traits<ReturnType(*)(ArgType...)>:
+        public function_traits<ReturnType(ArgType...)> {};
 
     /* match const member functions */
-    template<typename ClassType, typename ReturnType, typename ArgType>
-    struct function_traits<ReturnType(ClassType::*)(ArgType) const>:
-        public function_traits<ReturnType(ArgType)> {};
+    template<typename ClassType, typename ReturnType, typename... ArgType>
+    struct function_traits<ReturnType(ClassType::*)(ArgType...) const>:
+        public function_traits<ReturnType(ArgType...)> {};
 
     /* match member functions */
-    template<typename ClassType, typename ReturnType, typename ArgType>
-    struct function_traits<ReturnType(ClassType::*)(ArgType)>:
-        public function_traits<ReturnType(ArgType)> {};
+    template<typename ClassType, typename ReturnType, typename... ArgType>
+    struct function_traits<ReturnType(ClassType::*)(ArgType...)>:
+        public function_traits<ReturnType(ArgType...)> {};
 
     class Promise;
-    class promise_t {
-        std::shared_ptr<Promise> ptr;
+    class promise_t: std::shared_ptr<Promise> {
         public:
-
+        friend Promise;
+        template<typename PList> friend promise_t all(PList promise_list);
         template<typename Func>
-        promise_t(Func callback) {
-            ptr = std::make_shared<Promise>();
+        promise_t(Func callback):
+            std::shared_ptr<Promise>(std::make_shared<Promise>()) {
             callback(*this);
         }
 
         template<typename T> inline void resolve(T result) const;
         template<typename T> inline void reject(T reason) const;
-
-        template<typename FuncFulfilled, typename FuncRejected>
-        inline promise_t then_any(FuncFulfilled fulfilled_callback,
-                                FuncRejected rejected_callback) const;
-
-        template<typename FuncFulfilled>
-        inline promise_t then_any(FuncFulfilled fulfilled_callback) const;
-
-        template<typename FuncRejected>
-        inline promise_t fail_any(FuncRejected rejected_callback) const;
 
         template<typename FuncFulfilled>
         inline promise_t then(FuncFulfilled on_fulfilled) const;
@@ -127,8 +122,8 @@ namespace promise {
 #define PROMISE_ERR_MISMATCH_TYPE do {throw std::runtime_error("mismatching promise value types");} while (0)
     
     class Promise {
-        std::vector<function<void()>> fulfilled_callbacks;
-        std::vector<function<void()>> rejected_callbacks;
+        std::vector<callback_t> fulfilled_callbacks;
+        std::vector<callback_t> rejected_callbacks;
         enum class State {
             Pending,
             Fulfilled,
@@ -137,11 +132,11 @@ namespace promise {
         pm_any_t result;
         pm_any_t reason;
 
-        void add_on_fulfilled(function<void()> cb) {
+        void add_on_fulfilled(callback_t cb) {
             fulfilled_callbacks.push_back(cb);
         }
 
-        void add_on_rejected(function<void()> cb) {
+        void add_on_rejected(callback_t cb) {
             rejected_callbacks.push_back(cb);
         }
 
@@ -149,15 +144,15 @@ namespace promise {
         typename std::enable_if<
             std::is_same<typename function_traits<Func>::ret_type,
                          promise_t>::value>::type
-        gen_on_fulfilled(Func on_fulfilled, const promise_t &npm, function<void()> &ret) {
+        gen_on_fulfilled(Func on_fulfilled, const promise_t &npm, callback_t &ret) {
             ret = [this, on_fulfilled, npm]() mutable {
-                on_fulfilled(result).then_any(
+                on_fulfilled(result)->then(
                     [npm] (pm_any_t result_) {
-                        npm.resolve(result_);
+                        npm->resolve(result_);
                         return pm_any_t(none);
                     },
                     [npm] (pm_any_t reason_) {
-                        npm.reject(reason_);
+                        npm->reject(reason_);
                         return pm_any_t(none);
                     });
             };
@@ -167,9 +162,9 @@ namespace promise {
         typename std::enable_if<
             std::is_same<typename function_traits<Func>::ret_type,
                          pm_any_t>::value>::type
-        gen_on_fulfilled(Func on_fulfilled, const promise_t &npm, function<void()> &ret) {
+        gen_on_fulfilled(Func on_fulfilled, const promise_t &npm, callback_t &ret) {
             ret = [this, on_fulfilled, npm]() mutable {
-                npm.resolve(on_fulfilled(result));
+                npm->resolve(on_fulfilled(result));
             };
         }
 
@@ -177,15 +172,15 @@ namespace promise {
         typename std::enable_if<
             std::is_same<typename function_traits<Func>::ret_type,
                          promise_t>::value>::type
-        gen_on_rejected(Func on_rejected, const promise_t &npm, function<void()> &ret) {
+        gen_on_rejected(Func on_rejected, const promise_t &npm, callback_t &ret) {
             ret = [this, on_rejected, npm]() mutable {
-                on_rejected(reason).then_any(
+                on_rejected(reason)->then(
                     [npm] (pm_any_t result_) {
-                        npm.resolve(result_);
+                        npm->resolve(result_);
                         return pm_any_t(none);
                     },
                     [npm] (pm_any_t reason_) {
-                        npm.reject(reason_);
+                        npm->reject(reason_);
                         return pm_any_t(none);
                     });
             };
@@ -195,9 +190,9 @@ namespace promise {
         typename std::enable_if<
             std::is_same<typename function_traits<Func>::ret_type,
                          pm_any_t>::value>::type
-        gen_on_rejected(Func on_rejected, const promise_t &npm, function<void()> &ret) {
+        gen_on_rejected(Func on_rejected, const promise_t &npm, callback_t &ret) {
             ret = [this, on_rejected, npm]() mutable {
-                npm.reject(on_rejected(reason));
+                npm->reject(on_rejected(reason));
             };
         }
 
@@ -213,7 +208,7 @@ namespace promise {
             {
                 case State::Pending:
                     return promise_t([this, on_fulfilled, on_rejected](promise_t npm) {
-                        function<void()> ret;
+                        callback_t ret;
                         gen_on_fulfilled(on_fulfilled, npm, ret);
                         add_on_fulfilled(ret);
                         gen_on_rejected(on_rejected, npm, ret);
@@ -221,13 +216,13 @@ namespace promise {
                     });
                 case State::Fulfilled:
                     return promise_t([this, on_fulfilled](promise_t npm) {
-                        function<void()> ret;
+                        callback_t ret;
                         gen_on_fulfilled(on_fulfilled, npm, ret);
                         ret();
                     });
                 case State::Rejected:
                     return promise_t([this, on_rejected](promise_t npm) {
-                        function<void()> ret;
+                        callback_t ret;
                         gen_on_rejected(on_rejected, npm, ret);
                         ret();
                     });
@@ -241,19 +236,19 @@ namespace promise {
             {
                 case State::Pending:
                     return promise_t([this, on_fulfilled](promise_t npm) {
-                        function<void()> ret;
+                        callback_t ret;
                         gen_on_fulfilled(on_fulfilled, npm, ret);
                         add_on_fulfilled(ret);
-                        add_on_rejected([this, npm]() {npm.reject(reason);});
+                        add_on_rejected([this, npm]() {npm->reject(reason);});
                     });
                 case State::Fulfilled:
                     return promise_t([this, on_fulfilled](promise_t npm) {
-                        function<void()> ret;
+                        callback_t ret;
                         gen_on_fulfilled(on_fulfilled, npm, ret);
                         ret();
                     });
                 case State::Rejected:
-                    return promise_t([this](promise_t npm) {npm.reject(reason);});
+                    return promise_t([this](promise_t npm) {npm->reject(reason);});
                 default: PROMISE_ERR_INVALID_STATE;
             }
         }
@@ -264,16 +259,16 @@ namespace promise {
             {
                 case State::Pending:
                     return promise_t([this, on_rejected](promise_t npm) {
-                        function<void()> ret;
+                        callback_t ret;
                         gen_on_rejected(on_rejected, npm, ret);
                         add_on_rejected(ret);
-                        add_on_fulfilled([this, npm]() {npm.resolve(result);});
+                        add_on_fulfilled([this, npm]() {npm->resolve(result);});
                     });
                 case State::Fulfilled:
-                    return promise_t([this](promise_t npm) {npm.resolve(result);});
+                    return promise_t([this](promise_t npm) {npm->resolve(result);});
                 case State::Rejected:
                     return promise_t([this, on_rejected](promise_t npm) {
-                        function<void()> ret;
+                        callback_t ret;
                         gen_on_rejected(on_rejected, npm, ret);
                         ret();
                     });
@@ -318,15 +313,15 @@ namespace promise {
             results->resize(*size);
             size_t idx = 0;
             for (const auto &pm: promise_list) {
-                pm.then_any(
+                pm->then(
                     [results, size, idx, npm](pm_any_t result) {
                         (*results)[idx] = result;
                         if (!--(*size))
-                            npm.resolve(*results);
+                            npm->resolve(*results);
                         return pm_any_t(none);
                     },
                     [npm, size](pm_any_t reason) {
-                        npm.reject(reason);
+                        npm->reject(reason);
                         return pm_any_t(none);
                     });
                 idx++;
@@ -335,51 +330,50 @@ namespace promise {
     }
 
     template<typename T>
-    inline void promise_t::resolve(T result) const { ptr->resolve(result); }
+    inline void promise_t::resolve(T result) const { (*this)->resolve(result); }
 
     template<typename T>
-    inline void promise_t::reject(T reason) const { ptr->reject(reason); }
-
-    template<typename FuncFulfilled, typename FuncRejected>
-    inline promise_t promise_t::then_any(FuncFulfilled fulfilled_callback,
-                                    FuncRejected rejected_callback) const {
-        return ptr->then(fulfilled_callback, rejected_callback);
-    }
-
-    template<typename FuncFulfilled>
-    inline promise_t promise_t::then_any(FuncFulfilled fulfilled_callback) const {
-        return ptr->then(fulfilled_callback);
-    }
-
-    template<typename FuncRejected>
-    inline promise_t promise_t::fail_any(FuncRejected rejected_callback) const {
-        return ptr->fail(rejected_callback);
-    }
-
-    template<typename T>
-    struct callback_type_conversion {
-        using type = pm_any_t;
-    };
-
-    template<>
-    struct callback_type_conversion<promise_t> {
-        using type = promise_t;
-    };
+    inline void promise_t::reject(T reason) const { (*this)->reject(reason); }
 
     template<typename T>
     struct callback_types {
         using arg_type = typename function_traits<T>::arg_type;
-        using ret_type = typename callback_type_conversion<typename function_traits<T>::ret_type>::type;
+        using ret_type = typename std::conditional<
+            std::is_same<typename function_traits<T>::ret_type, promise_t>::value,
+            promise_t, pm_any_t>::type;
     };
+
+    template<typename Func,
+            typename std::enable_if<std::is_same<
+                typename function_traits<Func>::ret_type,
+                void>::value>::type * = nullptr>
+    constexpr auto convert_void_func_(Func f) {
+        return [f](typename function_traits<Func>::arg_type v) {
+            f(v);
+            return none;
+        };
+    }
+    
+    template<typename Func,
+            typename std::enable_if<!std::is_same<
+                typename function_traits<Func>::ret_type,
+                void>::value>::type * = nullptr>
+    constexpr auto convert_void_func_(Func f) { return f; }
+
+    template<typename Func, typename function_traits<Func>::empty_arg * = nullptr>
+    constexpr auto convert_void_func(Func f) { return convert_void_func_([f](None) {f();}); }
+
+    template<typename Func, typename function_traits<Func>::non_empty_arg * = nullptr>
+    constexpr auto convert_void_func(Func f) { return convert_void_func_(f); }
 
     template<typename FuncFulfilled>
     inline promise_t promise_t::then(FuncFulfilled on_fulfilled) const {
-        using arg_type = typename callback_types<FuncFulfilled>::arg_type;
-        using ret_type = typename callback_types<FuncFulfilled>::ret_type;
-        return ptr->then(
+        using fulfill_t = callback_types<FuncFulfilled>;
+        return (*this)->then(
             [on_fulfilled](pm_any_t _result) mutable {
                 try {
-                    return ret_type(on_fulfilled(any_cast<arg_type>(_result)));
+                    return typename fulfill_t::ret_type(convert_void_func(on_fulfilled)(
+                        any_cast<typename fulfill_t::arg_type>(_result)));
                 } catch (bad_any_cast e) { PROMISE_ERR_MISMATCH_TYPE; }
             });
     }
@@ -387,31 +381,31 @@ namespace promise {
     template<typename FuncFulfilled, typename FuncRejected>
     inline promise_t promise_t::then(FuncFulfilled on_fulfilled,
                                     FuncRejected on_rejected) const {
-        using fulfill_arg_type = typename callback_types<FuncFulfilled>::arg_type;
-        using fulfill_ret_type = typename callback_types<FuncFulfilled>::ret_type;
-        using reject_arg_type = typename callback_types<FuncRejected>::arg_type;
-        using reject_ret_type = typename callback_types<FuncRejected>::ret_type;
-        return ptr->then(
+        using fulfill_t = callback_types<FuncFulfilled>;
+        using reject_t = callback_types<FuncRejected>;
+        return (*this)->then(
             [on_fulfilled](pm_any_t _result) mutable {
                 try {
-                    return fulfill_ret_type(on_fulfilled(any_cast<fulfill_arg_type>(_result)));
+                    return typename fulfill_t::ret_type(convert_void_func(on_fulfilled)(
+                        any_cast<typename fulfill_t::arg_type>(_result)));
                 } catch (bad_any_cast e) { PROMISE_ERR_MISMATCH_TYPE; }
             },
             [on_rejected](pm_any_t _reason) mutable {
                 try {
-                    return reject_ret_type(on_rejected(any_cast<reject_arg_type>(_reason)));
+                    return typename reject_t::ret_type(convert_void_func(on_rejected)(
+                        any_cast<typename reject_t::arg_type>(_reason)));
                 } catch (bad_any_cast e) { PROMISE_ERR_MISMATCH_TYPE; }
             });
     }
 
     template<typename FuncRejected>
     inline promise_t promise_t::fail(FuncRejected on_rejected) const {
-        using arg_type = typename callback_types<FuncRejected>::arg_type;
-        using ret_type = typename callback_types<FuncRejected>::ret_type;
-        return ptr->fail(
+        using reject_t = callback_types<FuncRejected>;
+        return (*this)->fail(
             [on_rejected](pm_any_t _reason) mutable {
                 try {
-                    return ret_type(on_rejected(any_cast<arg_type>(_reason)));
+                    return typename reject_t::ret_type(convert_void_func(on_rejected)(
+                        any_cast<typename reject_t::arg_type>(_reason)));
                 } catch (bad_any_cast e) { PROMISE_ERR_MISMATCH_TYPE; }
             });
     }
