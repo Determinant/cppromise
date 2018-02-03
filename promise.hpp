@@ -56,9 +56,9 @@ namespace promise {
     using bad_any_cast = boost::bad_any_cast;
 #endif
 
-    using None = std::nullptr_t;
+    struct None {};
     using values_t = std::vector<pm_any_t>;
-    const auto none = nullptr;
+    const auto none = None();
     const auto do_nothing = [](){};
 
     /* match lambdas */
