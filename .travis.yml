@@ -1,34 +1,57 @@
 language: cpp
-compiler: gcc
-sudo: required
-dist: trusty
-
 matrix:
-    fast_finish: true
-    include:
-        - os: linux
-      	  addons:
-      	  	apt:
-      	    	sources:
-      	    	  - ubuntu-toolchain-r-test
-      	    	packages:
-      	    	  - g++-4.9
-      	env:
-      	   - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9"
+  include:
+    # works on Precise and Trusty
+    - os: linux
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-4.9
+      env:
+         - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9"
 
-        - os: linux
-      	  addons:
-      	  	apt:
-      	    	sources:
-      	    	  - ubuntu-toolchain-r-test
-      	    	packages:
-      	    	  - g++-5
-      	env:
-      	   - MATRIX_EVAL="CC=gcc-5 && CXX=g++-5"
+    # works on Precise and Trusty
+    - os: linux
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-5
+      env:
+         - MATRIX_EVAL="CC=gcc-5 && CXX=g++-5"
+
+    # works on Precise and Trusty
+    - os: linux
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-6
+      env:
+        - MATRIX_EVAL="CC=gcc-6 && CXX=g++-6"
+
+    # works on Precise and Trusty
+    - os: linux
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-7
+      env:
+        - MATRIX_EVAL="CC=gcc-7 && CXX=g++-7"
 
 before_install:
-    - sudo apt-get install libboost-all-dev
     - eval "${MATRIX_EVAL}"
+
+install:
+  	- sudo apt-get install libboost-all-dev
 
 script:
     - make
+    - ./test14 | diff - test_ref.txt
+    - ./test17 | diff - test_ref.txt
