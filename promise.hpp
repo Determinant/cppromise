@@ -29,6 +29,7 @@
 #include <functional>
 #include <type_traits>
 
+#if __cplusplus >= 201703L
 #ifdef __has_include
 #   if __has_include(<any>)
 #       include <any>
@@ -36,6 +37,7 @@
 #           define _CPPROMISE_STD_ANY
 #       endif
 #   endif
+#endif
 #endif
 
 #ifndef _CPPROMISE_STD_ANY
