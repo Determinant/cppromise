@@ -1,0 +1,34 @@
+language: cpp
+compiler: gcc
+sudo: required
+dist: trusty
+
+matrix:
+    fast_finish: true
+    include:
+        - os: linux
+      	  addons:
+      	  	apt:
+      	    	sources:
+      	    	  - ubuntu-toolchain-r-test
+      	    	packages:
+      	    	  - g++-4.9
+      	env:
+      	   - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9"
+
+        - os: linux
+      	  addons:
+      	  	apt:
+      	    	sources:
+      	    	  - ubuntu-toolchain-r-test
+      	    	packages:
+      	    	  - g++-5
+      	env:
+      	   - MATRIX_EVAL="CC=gcc-5 && CXX=g++-5"
+
+before_install:
+    - sudo apt-get install libboost-all-dev
+    - eval "${MATRIX_EVAL}"
+
+script:
+    - make

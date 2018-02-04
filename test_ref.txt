@@ -1,0 +1,24 @@
+promise 1 constructed, but won't be resolved immediately
+promise 3 constructed
+promise 4 constructed
+promise 5 constructed
+calling t4: resolve promise 3
+calling t5: resolve promise 4
+calling t3: resolve promise 5
+promise 3, 4, 5 resolved with 1, 1.50, "hello world"
+calling t1: resolve first half of promise 1
+got resolved x = 10, output x + 42
+got resolved x = 52, output x * 2
+get resolved x = 104, promise 2 constructed, not resolved, will be resolved with a string instead
+calling t2: resolve the second half of promise 1 (promise 2)
+got string from promise 2: "promise 2 resolved", output 11
+got resolved x = 11, output 12
+plain function f resolved with 12
+operator A got 13
+operator B got 14
+plain function g resolved with 15
+operator A got 1
+void return is ok
+void parameter is ok
+void parameter will ignore the returned value
+finally 100

@@ -27,12 +27,18 @@
 #include <vector>
 #include <memory>
 #include <functional>
+#include <type_traits>
 
-#if __has_include("any")
-#include <any>
+#ifdef __has_include
+#   if __has_include(<any>)
+#       include <any>
+#       ifdef __cpp_lib_any
+#           define _CPPROMISE_STD_ANY
+#       endif
+#   endif
 #endif
 
-#if !defined(__cpp_lib_any)
+#ifndef _CPPROMISE_STD_ANY
 #include <boost/any.hpp>
 #endif
 
@@ -41,14 +47,14 @@
  * Javascript Promise/A+.
  */
 namespace promise {
-#if defined(__cpp_lib_any)
+#ifdef _CPPROMISE_STD_ANY
     using pm_any_t = std::any;
     template<typename T>
     constexpr auto any_cast = static_cast<T(*)(const std::any&)>(std::any_cast<T>);
     using bad_any_cast = std::bad_any_cast;
 #else
-#warning "using boost::any"
-#pragma message "using boost::any"
+#   warning "using boost::any"
+#   pragma message "using boost::any"
     using pm_any_t = boost::any;
     template<typename T>
     constexpr auto any_cast = static_cast<T(*)(const boost::any&)>(boost::any_cast<T>);

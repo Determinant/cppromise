@@ -1,61 +1,66 @@
 #include <string>
+#include <functional>
 #include "promise.hpp"
+
+using callback_t = std::function<void()>;
 using promise::promise_t;
 using promise::any_cast;
 
 struct A {
     int operator()(int x) {
-        printf("%d\n", x);
-        return 1;
+        printf("operator A got %d\n", x);
+        return x + 1;
     }
 };
 
 struct B {
     promise_t operator()(int x) {
-        printf("%d\n", x);
-        return promise_t([](promise_t pm) {pm.resolve(1);});
+        printf("operator B got %d\n", x);
+        return promise_t([x](promise_t pm) {pm.resolve(x + 1);});
     }
 };
 
 int f(int x) {
-    printf("%d\n", x);
+    printf("plain function f resolved with %d\n", x);
     return x + 1;
 }
 
 promise_t g(int x) {
-    printf("%d\n", x);
+    printf("plain function g resolved with %d\n", x);
     return promise_t([](promise_t pm) {pm.resolve(1);});
 }
 
 int main() {
-    std::function<void()> t1;
-    std::function<void()> t2;
-    std::function<void()> t3;
-    std::function<void()> t4;
-    std::function<void()> t5;
+    callback_t t1;
+    callback_t t2;
+    callback_t t3;
+    callback_t t4;
+    callback_t t5;
     A a1, a2, a3;
     B b1, b2, b3;
-    auto pm = promise_t([&t1](promise_t pm) {
-        puts("pm1");
-        //t1 = [pm]() {pm.reject(5);};
-        t1 = [pm]() {pm.resolve(5);};
+    auto pm1 = promise_t([&t1](promise_t pm) {
+        puts("promise 1 constructed, but won't be resolved immediately");
+        t1 = [pm]() {pm.resolve(10);};
     }).then([](int x) {
-        printf("%d\n", x);
-        return 6;
-    }).then([](int y) {
-        printf("%d\n", y);
-        return 0;
+        printf("got resolved x = %d, output x + 42\n", x);
+        return x + 42;
+    }).then([](int x) {
+        printf("got resolved x = %d, output x * 2\n", x);
+        return x * 2;
     }).then([&t2](int x) {
         auto pm2 = promise_t([x, &t2](promise_t pm2) {
-            printf("pm2 %d\n", x);
-            t2 = [pm2]() {pm2.resolve(std::string("hello"));};
+            printf("get resolved x = %d, "
+                    "promise 2 constructed, not resolved, "
+                    "will be resolved with a string instead\n", x);
+            t2 = [pm2]() {pm2.resolve(std::string("promise 2 resolved"));};
         });
         return pm2;
     }).then([](std::string s) {
-        printf("%s\n", s.c_str());
-        return 10;
+        printf("got string from promise 2: \"%s\", "
+                "output 11\n", s.c_str());
+        return 11;
     }).then([](int x) {
-        printf("%d\n", x);
+        printf("got resolved x = %d, output 12\n", x);
         return 12;
     }).then(f).then(a1).fail(a2).then(b1).fail(b2).then(g).then(a3, b3)
     .then([](int x) {
@@ -67,30 +72,31 @@ int main() {
         puts("void parameter will ignore the returned value");
     });
     
-    auto p1 = promise_t([&t4](promise_t pm) {
-        puts("p1");
+    auto pm3 = promise_t([&t4](promise_t pm) {
+        puts("promise 3 constructed");
         t4 = [pm]() {pm.resolve(1);};
     });
 
-    auto p2 = promise_t([&t5](promise_t pm) {
-        puts("p2");
-        t5 = [pm]() {pm.resolve(std::string("hello"));};
+    auto pm4 = promise_t([&t5](promise_t pm) {
+        puts("promise 4 constructed");
+        t5 = [pm]() {pm.resolve(1.5);};
     });
 
-    auto p3 = promise_t([&t3](promise_t pm) {
-        puts("p3");
-        t3 = [pm]() {pm.resolve(std::string("world"));};
+    auto pm5 = promise_t([&t3](promise_t pm) {
+        puts("promise 5 constructed");
+        t3 = [pm]() {pm.resolve(std::string("hello world"));};
     });
 
-    auto p4 = promise::all(std::vector<promise_t>{p1, p2, p3})
+    auto pm6 = promise::all(std::vector<promise_t>{pm3, pm4, pm5})
         .then([](const promise::values_t values) {
-            printf("%d %s %s\n", any_cast<int>(values[0]),
-                                any_cast<std::string>(values[1]).c_str(),
-                                any_cast<std::string>(values[2]).c_str());
+            printf("promise 3, 4, 5 resolved with %d, %.2f, \"%s\"\n",
+                    any_cast<int>(values[0]),
+                    any_cast<double>(values[1]),
+                    any_cast<std::string>(values[2]).c_str());
             return 100;
         });
 
-    auto p5 = promise::all(std::vector<promise_t>{pm, p4})
+    auto pm7 = promise::all(std::vector<promise_t>{pm1, pm6})
         .fail([](int reason) {
             printf("reason: %d\n", reason);
             return reason;
@@ -98,14 +104,14 @@ int main() {
         .then([](const promise::values_t values) {
             printf("finally %d\n", any_cast<int>(values[1]));
         });
-    puts("calling t");
+    puts("calling t4: resolve promise 3");
     t4();
-    puts("calling t2");
+    puts("calling t5: resolve promise 4");
     t5();
-    puts("calling t3");
+    puts("calling t3: resolve promise 5");
     t3();
-
+    puts("calling t1: resolve first half of promise 1");
     t1();
-    printf("=== after ===\n");
+    puts("calling t2: resolve the second half of promise 1 (promise 2)");
     t2();
 }
