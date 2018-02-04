@@ -7,7 +7,7 @@ CPPromise
 .. image:: https://img.shields.io/github/license/Determinant/cppromise.svg
    :target: https://github.com/Determinant/cppromise
 
-This is a lightweight C++14/17 compatiable implementation of promises (similar
+This is a lightweight C++14/17 compatible implementation of promises (similar
 to Javascript Promise/A+). It allows type-safe polymorphic promises and incurs
 little runtime overhead. The runtime type-checking is enforced and supported by
 the underlying `any` type, an exception will be thrown when the resolved value
@@ -36,7 +36,7 @@ registered ``on_fulfilled()`` function will be invoked using ``result`` as the a
 
 .. code-block:: cpp
 
-    tempalte<typename T> reject(T reason) const;
+    template<typename T> reject(T reason) const;
 
 Reject the promise with value ``result``. This may reject the other promises
 waiting for the current promise recursively. When a promise is rejected, the
