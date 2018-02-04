@@ -66,6 +66,6 @@ that follow the created promise.
 
     template<typename FuncFulfilled, typename FuncRejected>
     promise_t then(FuncFulfilled on_fulfilled,
-                            FuncRejected on_rejected) const;
+                   FuncRejected on_rejected) const;
 
 Create a promise that handles both resolution and rejection of the current promise.
