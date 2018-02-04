@@ -1,6 +1,12 @@
 CPPromise
 =========
 
+.. image:: https://img.shields.io/travis/Determinant/cppromise.svg
+   :target: https://github.com/Determinant/cppromise
+
+.. image:: https://img.shields.io/github/license/Determinant/cppromise.svg
+   :target: https://github.com/Determinant/cppromise
+
 This is a lightweight C++14/17 compatiable implementation of promises (similar
 to Javascript Promise/A+). It allows type-safe polymorphic promises and incurs
 little runtime overhead. The runtime type-checking is enforced and supported by
