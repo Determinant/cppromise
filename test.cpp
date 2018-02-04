@@ -63,7 +63,7 @@ int main() {
         printf("got resolved x = %d, output 12\n", x);
         return 12;
     }).then(f).then(a1).fail(a2).then(b1).fail(b2).then(g).then(a3, b3)
-    .then([](int x) {
+    .then([](int) {
         puts("void return is ok");
     }).then([]() {
         puts("void parameter is ok");
@@ -102,8 +102,21 @@ int main() {
             return reason;
         })
         .then([](const promise::values_t values) {
-            printf("finally %d\n", any_cast<int>(values[1]));
+            int x = any_cast<int>(values[1]);
+            printf("promise 1, 6 resolved %d\n", x);
+            return x + 1;
         });
+
+    auto pm8 = promise_t([](promise_t) {
+        puts("promsie 8 will never be resolved");
+    });
+
+    auto pm9 = promise::race(std::vector<promise_t>{pm7, pm8})
+        .then([](promise::pm_any_t value) {
+            printf("finally, promise 9 resolved with %d\n",
+                    any_cast<int>(value));
+        });
+
     puts("calling t4: resolve promise 3");
     t4();
     puts("calling t5: resolve promise 4");

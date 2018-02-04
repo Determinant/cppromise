@@ -2,6 +2,7 @@ promise 1 constructed, but won't be resolved immediately
 promise 3 constructed
 promise 4 constructed
 promise 5 constructed
+promsie 8 will never be resolved
 calling t4: resolve promise 3
 calling t5: resolve promise 4
 calling t3: resolve promise 5
@@ -21,4 +22,5 @@ operator A got 1
 void return is ok
 void parameter is ok
 void parameter will ignore the returned value
-finally 100
+promise 1, 6 resolved 100
+finally, promise 9 resolved with 101

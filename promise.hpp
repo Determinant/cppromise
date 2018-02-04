@@ -110,11 +110,22 @@ namespace promise {
             !std::is_same<typename function_traits<Func>::ret_type,
                          ReturnType>::value>;
 
+    template<typename Func, typename ArgType>
+    using enable_if_arg = typename std::enable_if<
+            std::is_same<typename function_traits<Func>::arg_type,
+                         ArgType>::value>;
+
+    template<typename Func, typename ArgType>
+    using disable_if_arg = typename std::enable_if<
+            !std::is_same<typename function_traits<Func>::arg_type,
+                         ArgType>::value>;
+
     class Promise;
     class promise_t: std::shared_ptr<Promise> {
         public:
         friend Promise;
         template<typename PList> friend promise_t all(PList promise_list);
+        template<typename PList> friend promise_t race(PList promise_list);
         template<typename Func>
         promise_t(Func callback):
             std::shared_ptr<Promise>(std::make_shared<Promise>()) {
@@ -159,29 +170,25 @@ namespace promise {
             rejected_callbacks.push_back(cb);
         }
 
-        template<typename Func, typename function_traits<Func>::non_empty_arg * = nullptr>
-        static constexpr auto cps_transform(Func f, const pm_any_t &result, const promise_t &npm) {
+        template<typename Func,
+            typename function_traits<Func>::non_empty_arg * = nullptr>
+        static constexpr auto cps_transform(
+                Func f, const pm_any_t &result, const promise_t &npm) {
             return [&result, f, npm]() mutable {
                 f(result)->then(
-                    [npm] (pm_any_t result_) {
-                        npm->resolve(result_);
-                    },
-                    [npm] (pm_any_t reason_) {
-                        npm->reject(reason_);
-                    });
+                    [npm] (pm_any_t result) {npm->resolve(result);},
+                    [npm] (pm_any_t reason) {npm->reject(reason);});
             };
         }
 
-        template<typename Func, typename function_traits<Func>::empty_arg * = nullptr>
-        static constexpr auto cps_transform(Func f, const pm_any_t &, const promise_t &npm) {
+        template<typename Func,
+            typename function_traits<Func>::empty_arg * = nullptr>
+        static constexpr auto cps_transform(
+                Func f, const pm_any_t &, const promise_t &npm) {
             return [f, npm]() mutable {
                 f()->then(
-                    [npm] (pm_any_t result_) {
-                        npm->resolve(result_);
-                    },
-                    [npm] (pm_any_t reason_) {
-                        npm->reject(reason_);
-                    });
+                    [npm] (pm_any_t result) {npm->resolve(result);},
+                    [npm] (pm_any_t reason) {npm->reject(reason);});
             };
         }
 
@@ -391,10 +398,17 @@ namespace promise {
                         if (!--(*size))
                             npm->resolve(*results);
                     },
-                    [npm, size](pm_any_t reason) {
-                        npm->reject(reason);
-                    });
+                    [npm](pm_any_t reason) {npm->reject(reason);});
                 idx++;
+            }
+        });
+    }
+
+    template<typename PList> promise_t race(PList promise_list) {
+        return promise_t([promise_list] (promise_t npm) {
+            for (const auto &pm: promise_list) {
+                pm->then([npm](pm_any_t result) {npm->resolve(result);},
+                        [npm](pm_any_t reason) {npm->reject(reason);});
             }
         });
     }
@@ -417,6 +431,7 @@ namespace promise {
     };
 
     template<typename Func,
+        typename disable_if_arg<Func, pm_any_t>::type * = nullptr,
         typename enable_if_return<Func, void>::type * = nullptr,
         typename function_traits<Func>::non_empty_arg * = nullptr>
     constexpr auto gen_any_callback(Func f) {
@@ -429,11 +444,32 @@ namespace promise {
     }
 
     template<typename Func,
+        typename enable_if_arg<Func, pm_any_t>::type * = nullptr,
+        typename enable_if_return<Func, void>::type * = nullptr,
+        typename function_traits<Func>::non_empty_arg * = nullptr>
+    constexpr auto gen_any_callback(Func f) {
+        using func_t = callback_types<Func>;
+        return [f](pm_any_t v) mutable {f(v);};
+    }
+
+    template<typename Func,
         typename enable_if_return<Func, void>::type * = nullptr,
         typename function_traits<Func>::empty_arg * = nullptr>
     constexpr auto gen_any_callback(Func f) { return f; }
 
     template<typename Func,
+        typename enable_if_arg<Func, pm_any_t>::type * = nullptr,
+        typename disable_if_return<Func, void>::type * = nullptr,
+        typename function_traits<Func>::non_empty_arg * = nullptr>
+    constexpr auto gen_any_callback(Func f) {
+        using func_t = callback_types<Func>;
+        return [f](pm_any_t v) mutable {
+            return typename func_t::ret_type(f(v));
+        };
+    }
+
+    template<typename Func,
+        typename disable_if_arg<Func, pm_any_t>::type * = nullptr,
         typename disable_if_return<Func, void>::type * = nullptr,
         typename function_traits<Func>::non_empty_arg * = nullptr>
     constexpr auto gen_any_callback(Func f) {
