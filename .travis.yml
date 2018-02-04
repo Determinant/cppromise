@@ -1,4 +1,6 @@
 language: cpp
+notifications:
+  email: false
 matrix:
   include:
     # works on Precise and Trusty
