@@ -65,7 +65,7 @@ that follow the created promise.
 .. code-block:: cpp
 
     template<typename FuncFulfilled, typename FuncRejected>
-    inline promise_t then(FuncFulfilled on_fulfilled,
+    promise_t then(FuncFulfilled on_fulfilled,
                             FuncRejected on_rejected) const;
 
 Create a promise that handles both resolution and rejection of the current promise.
