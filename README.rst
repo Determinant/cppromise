@@ -11,7 +11,7 @@ types do not match the types expected in the subsequent computation. See
 API
 ===
 
-::
+.. code-block:: cpp
 
     typename<typename Func> promise_t(Func callback);
 
@@ -20,7 +20,7 @@ immediately after the object is constructed, so usually the user registers
 ``pm`` to some external logic which triggers ``pm.resolve()`` or
 ``pm.reject()`` when the time comes.
 
-::
+.. code-block:: cpp
 
     template<typename T> resolve(T result) const;
 
@@ -28,7 +28,7 @@ Resolve the promise with value ``result``. This may trigger the other promises
 waiting for the current promise recursively. When a promise is triggered, the
 registered ``on_fulfilled()`` function will be invoked using ``result`` as the argument.
 
-::
+.. code-block:: cpp
 
     tempalte<typename T> reject(T reason) const;
 
@@ -36,7 +36,7 @@ Reject the promise with value ``result``. This may reject the other promises
 waiting for the current promise recursively. When a promise is rejected, the
 registered ``on_rejected()`` function will be invoked using ``reason`` as the argument.
 
-::
+.. code-block:: cpp
 
     template<typename FuncFulfilled>
     promise_t then(FuncFulfilled on_fulfilled) const;
@@ -46,7 +46,7 @@ Create a new promise that waits for the resolution of the current promise.
 resolved. The rejection will skip the callback and pass on to the promises that
 follow the created promise.
 
-::
+.. code-block:: cpp
 
     template<typename FuncRejected>
     promise_t fail(FuncRejected on_rejected) const;
@@ -56,7 +56,7 @@ Create a new promise that waits for the rejection of the current promise.
 rejected. The resolution will skip the callback and pass on to the promises
 that follow the created promise.
 
-::
+.. code-block:: cpp
 
     template<typename FuncFulfilled, typename FuncRejected>
     inline promise_t then(FuncFulfilled on_fulfilled,
