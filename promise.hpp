@@ -121,11 +121,13 @@ namespace promise {
                          ArgType>::value>;
 
     class Promise;
-    class promise_t: std::shared_ptr<Promise> {
+    class promise_t: public std::shared_ptr<Promise> {
         public:
         friend Promise;
         template<typename PList> friend promise_t all(PList promise_list);
         template<typename PList> friend promise_t race(PList promise_list);
+
+        promise_t() = delete;
         template<typename Func>
         promise_t(Func callback):
             std::shared_ptr<Promise>(std::make_shared<Promise>()) {
@@ -384,11 +386,11 @@ namespace promise {
         }
     };
         
-    template<typename PList> promise_t all(PList promise_list) {
-        return promise_t([promise_list] (promise_t npm) {
+    template<typename PList> promise_t all(const PList &promise_list) {
+        return promise_t([&promise_list] (promise_t npm) {
             auto size = std::make_shared<size_t>(promise_list.size());
             auto results = std::make_shared<values_t>();
-            if (!size) PROMISE_ERR_MISMATCH_TYPE;
+            if (!*size) PROMISE_ERR_MISMATCH_TYPE;
             results->resize(*size);
             size_t idx = 0;
             for (const auto &pm: promise_list) {
@@ -404,8 +406,8 @@ namespace promise {
         });
     }
 
-    template<typename PList> promise_t race(PList promise_list) {
-        return promise_t([promise_list] (promise_t npm) {
+    template<typename PList> promise_t race(const PList &promise_list) {
+        return promise_t([&promise_list] (promise_t npm) {
             for (const auto &pm: promise_list) {
                 pm->then([npm](pm_any_t result) {npm->resolve(result);},
                         [npm](pm_any_t reason) {npm->reject(reason);});
@@ -448,7 +450,6 @@ namespace promise {
         typename enable_if_return<Func, void>::type * = nullptr,
         typename function_traits<Func>::non_empty_arg * = nullptr>
     constexpr auto gen_any_callback(Func f) {
-        using func_t = callback_types<Func>;
         return [f](pm_any_t v) mutable {f(v);};
     }
 
