@@ -48,7 +48,7 @@ argument.
 
     promise_t::resolve() const;
 
-Resolve the promise without empty result. This may trigger the other promises
+Resolve the promise with empty result. This may trigger the other promises
 waiting for the current promise recursively. When a promise is triggered, the
 registered ``on_fulfilled()`` function should be expecting no argument,
 otherwise a type mismatch is thrown.
@@ -57,7 +57,7 @@ otherwise a type mismatch is thrown.
 
     promise_t::reject() const;
 
-Reject the promise without empty reason. This may reject the other promises
+Reject the promise with empty reason. This may reject the other promises
 waiting for the current promise recursively. When a promise is rejected, the
 registered ``on_rejected()`` function should be expecting on argument,
 otherwise a type mismatch is thrown.
@@ -93,7 +93,7 @@ the current promise.
 
 .. code-block:: cpp
 
-    template<typename PList> promise_t promise::all(PList promise_list);
+    template<typename PList> promise_t promise::all(const PList &promise_list);
 
 Create a promise waiting for the asynchronous resolution of all promises in
 ``promise_list``. The result for the created promise will be typed
@@ -104,7 +104,7 @@ promises.
 
 .. code-block:: cpp
 
-    template<typename PList> promise_t promise::race(PList promise_list);
+    template<typename PList> promise_t promise::race(const PList &promise_list);
 
 Create a promise waiting for the asynchronous resolution of any promises in
 ``promise_list``. The result for the created promise will be the result from

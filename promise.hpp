@@ -124,8 +124,8 @@ namespace promise {
     class promise_t: public std::shared_ptr<Promise> {
         public:
         friend Promise;
-        template<typename PList> friend promise_t all(PList promise_list);
-        template<typename PList> friend promise_t race(PList promise_list);
+        template<typename PList> friend promise_t all(const PList &promise_list);
+        template<typename PList> friend promise_t race(const PList &promise_list);
 
         promise_t() = delete;
         template<typename Func>

@@ -97,10 +97,6 @@ int main() {
         });
 
     auto pm7 = promise::all(std::vector<promise_t>{pm1, pm6})
-        .fail([](int reason) {
-            printf("reason: %d\n", reason);
-            return reason;
-        })
         .then([](const promise::values_t values) {
             int x = any_cast<int>(values[1]);
             printf("promise 1, 6 resolved %d\n", x);
@@ -113,10 +109,30 @@ int main() {
 
     auto pm9 = promise::race(std::vector<promise_t>{pm7, pm8})
         .then([](promise::pm_any_t value) {
-            printf("finally, promise 9 resolved with %d\n",
+            printf("promise 9 resolved with %d\n",
                     any_cast<int>(value));
+        })
+        .then([]() {
+            puts("rejecting with value -1");
+            return promise_t([](promise_t pm) {
+                pm.reject(-1);
+            });
+        })
+        .then([]() {
+            puts("this line should not appear in the output");
+        })
+        .then([](int) {
+            puts("this line should not appear in the outputs");
+        })
+        .fail([](int reason) {
+            printf("reason: %d\n", reason);
+            return reason + 1;
+        }).then([](){
+            puts("this line should not appear in the outputs");
+        },
+        [](int reason) {
+            printf("reason: %d\n", reason);
         });
-
     puts("calling t4: resolve promise 3");
     t4();
     puts("calling t5: resolve promise 4");
