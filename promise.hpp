@@ -121,17 +121,34 @@ namespace promise {
                          ArgType>::value>;
 
     class Promise;
-    class promise_t: public std::shared_ptr<Promise> {
+    //class promise_t: public std::shared_ptr<Promise> {
+    class promise_t {
+        Promise *pm;
+        size_t *ref_cnt;
         public:
         friend Promise;
         template<typename PList> friend promise_t all(const PList &promise_list);
         template<typename PList> friend promise_t race(const PList &promise_list);
 
         promise_t() = delete;
-        template<typename Func>
-        promise_t(Func callback):
-            std::shared_ptr<Promise>(std::make_shared<Promise>()) {
-            callback(*this);
+        promise_t &operator=(const promise_t &other) = delete;
+        template<typename Func> inline promise_t(Func callback);
+        inline ~promise_t();
+
+        promise_t(const promise_t &other):
+            pm(other.pm),
+            ref_cnt(other.ref_cnt) {
+            ++*ref_cnt;
+        }
+
+        promise_t(promise_t &&other):
+            pm(other.pm),
+            ref_cnt(other.ref_cnt) {
+            other.pm = nullptr;
+        }
+
+        Promise *operator->() const {
+            return pm;
         }
 
         template<typename T> inline void resolve(T result) const;
@@ -413,6 +430,22 @@ namespace promise {
                         [npm](pm_any_t reason) {npm->reject(reason);});
             }
         });
+    }
+
+    template<typename Func>
+    inline promise_t::promise_t(Func callback):
+            pm(new Promise()),
+        ref_cnt(new size_t(1)) {
+        callback(*this);
+    }
+
+    inline promise_t::~promise_t() {
+        if (pm)
+        {
+            if (--*ref_cnt) return;
+            delete pm;
+            delete ref_cnt;
+        }
     }
 
     template<typename T>
