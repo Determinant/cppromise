@@ -486,7 +486,7 @@ namespace promise {
         return [f](pm_any_t v) mutable {
             try {
                 f(any_cast<typename func_t::arg_type>(v));
-            } catch (bad_any_cast e) { PROMISE_ERR_MISMATCH_TYPE; }
+            } catch (bad_any_cast &e) { PROMISE_ERR_MISMATCH_TYPE; }
         };
     }
 
@@ -524,7 +524,7 @@ namespace promise {
             try {
                 return typename func_t::ret_type(
                     f(any_cast<typename func_t::arg_type>(v)));
-            } catch (bad_any_cast e) { PROMISE_ERR_MISMATCH_TYPE; }
+            } catch (bad_any_cast &e) { PROMISE_ERR_MISMATCH_TYPE; }
         };
     }
 
