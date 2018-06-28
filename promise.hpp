@@ -189,19 +189,19 @@ namespace promise {
         pm_any_t result;
         pm_any_t reason;
 
-        void add_on_fulfilled(callback_t cb) {
-            fulfilled_callbacks.push_back(cb);
+        void add_on_fulfilled(callback_t &&cb) {
+            fulfilled_callbacks.push_back(std::move(cb));
         }
 
-        void add_on_rejected(callback_t cb) {
-            rejected_callbacks.push_back(cb);
+        void add_on_rejected(callback_t &&cb) {
+            rejected_callbacks.push_back(std::move(cb));
         }
 
         template<typename Func,
             typename function_traits<Func>::non_empty_arg * = nullptr>
         static constexpr auto cps_transform(
                 Func f, const pm_any_t &result, const promise_t &npm) {
-            return [&result, f, npm]() mutable {
+            return [&result, npm, f = std::forward<Func>(f)]() mutable {
                 f(result)->then(
                     [npm] (pm_any_t result) {npm->resolve(result);},
                     [npm] (pm_any_t reason) {npm->reject(reason);});
@@ -212,7 +212,7 @@ namespace promise {
             typename function_traits<Func>::empty_arg * = nullptr>
         static constexpr auto cps_transform(
                 Func f, const pm_any_t &, const promise_t &npm) {
-            return [f, npm]() mutable {
+            return [npm, f = std::forward<Func>(f)]() mutable {
                 f()->then(
                     [npm] (pm_any_t result) {npm->resolve(result);},
                     [npm] (pm_any_t reason) {npm->reject(reason);});
@@ -222,13 +222,13 @@ namespace promise {
         template<typename Func,
             typename enable_if_return<Func, promise_t>::type * = nullptr>
         constexpr auto gen_on_fulfilled(Func on_fulfilled, const promise_t &npm) {
-            return cps_transform(on_fulfilled, this->result, npm);
+            return cps_transform(std::forward<Func>(on_fulfilled), this->result, npm);
         }
 
         template<typename Func,
             typename enable_if_return<Func, promise_t>::type * = nullptr>
         constexpr auto gen_on_rejected(Func on_rejected, const promise_t &npm) {
-            return cps_transform(on_rejected, this->reason, npm);
+            return cps_transform(std::forward<Func>(on_rejected), this->reason, npm);
         }
 
 
@@ -236,7 +236,8 @@ namespace promise {
             typename enable_if_return<Func, void>::type * = nullptr,
             typename function_traits<Func>::non_empty_arg * = nullptr>
         constexpr auto gen_on_fulfilled(Func on_fulfilled, const promise_t &npm) {
-            return [this, on_fulfilled, npm]() mutable {
+            return [this, npm,
+                    on_fulfilled = std::forward<Func>(on_fulfilled)]() mutable {
                 on_fulfilled(result);
                 npm->resolve();
             };
@@ -246,7 +247,7 @@ namespace promise {
             typename enable_if_return<Func, void>::type * = nullptr,
             typename function_traits<Func>::empty_arg * = nullptr>
         constexpr auto gen_on_fulfilled(Func on_fulfilled, const promise_t &npm) {
-            return [on_fulfilled, npm]() mutable {
+            return [on_fulfilled = std::forward<Func>(on_fulfilled), npm]() mutable {
                 on_fulfilled();
                 npm->resolve();
             };
@@ -256,7 +257,8 @@ namespace promise {
             typename enable_if_return<Func, void>::type * = nullptr,
             typename function_traits<Func>::non_empty_arg * = nullptr>
         constexpr auto gen_on_rejected(Func on_rejected, const promise_t &npm) {
-            return [this, on_rejected, npm]() mutable {
+            return [this, npm,
+                    on_rejected = std::forward<Func>(on_rejected)]() mutable {
                 on_rejected(reason);
                 npm->reject();
             };
@@ -266,7 +268,8 @@ namespace promise {
             typename enable_if_return<Func, void>::type * = nullptr,
             typename function_traits<Func>::empty_arg * = nullptr>
         constexpr auto gen_on_rejected(Func on_rejected, const promise_t &npm) {
-            return [on_rejected, npm]() mutable {
+            return [npm,
+                    on_rejected = std::forward<Func>(on_rejected)]() mutable {
                 on_rejected();
                 npm->reject();
             };
@@ -276,7 +279,8 @@ namespace promise {
             typename enable_if_return<Func, pm_any_t>::type * = nullptr,
             typename function_traits<Func>::non_empty_arg * = nullptr>
         constexpr auto gen_on_fulfilled(Func on_fulfilled, const promise_t &npm) {
-            return [this, on_fulfilled, npm]() mutable {
+            return [this, npm,
+                    on_fulfilled = std::forward<Func>(on_fulfilled)]() mutable {
                 npm->resolve(on_fulfilled(result));
             };
         }
@@ -285,7 +289,7 @@ namespace promise {
             typename enable_if_return<Func, pm_any_t>::type * = nullptr,
             typename function_traits<Func>::empty_arg * = nullptr>
         constexpr auto gen_on_fulfilled(Func on_fulfilled, const promise_t &npm) {
-            return [on_fulfilled, npm]() mutable {
+            return [npm, on_fulfilled = std::forward<Func>(on_fulfilled)]() mutable {
                 npm->resolve(on_fulfilled());
             };
         }
@@ -294,7 +298,7 @@ namespace promise {
             typename enable_if_return<Func, pm_any_t>::type * = nullptr,
             typename function_traits<Func>::non_empty_arg * = nullptr>
         constexpr auto gen_on_rejected(Func on_rejected, const promise_t &npm) {
-            return [this, on_rejected, npm]() mutable {
+            return [this, npm, on_rejected = std::forward<Func>(on_rejected)]() mutable {
                 npm->reject(on_rejected(reason));
             };
         }
@@ -303,7 +307,7 @@ namespace promise {
             typename enable_if_return<Func, pm_any_t>::type * = nullptr,
             typename function_traits<Func>::empty_arg * = nullptr>
         constexpr auto gen_on_rejected(Func on_rejected, const promise_t &npm) {
-            return [on_rejected, npm]() mutable {
+            return [npm, on_rejected = std::forward<Func>(on_rejected)]() mutable {
                 npm->reject(on_rejected());
             };
         }
@@ -331,57 +335,65 @@ namespace promise {
             switch (state)
             {
                 case State::Pending:
-                    return promise_t([this, on_fulfilled, on_rejected](promise_t npm) {
-                        add_on_fulfilled(gen_on_fulfilled(on_fulfilled, npm));
-                        add_on_rejected(gen_on_rejected(on_rejected, npm));
-                    });
+                return promise_t([this,
+                                on_fulfilled = std::forward<FuncFulfilled>(on_fulfilled),
+                                on_rejected = std::forward<FuncRejected>(on_rejected)](promise_t npm) {
+                    add_on_fulfilled(gen_on_fulfilled(std::move(on_fulfilled), npm));
+                    add_on_rejected(gen_on_rejected(std::move(on_rejected), npm));
+                });
                 case State::Fulfilled:
-                    return promise_t([this, on_fulfilled](promise_t npm) {
-                        gen_on_fulfilled(on_fulfilled, npm)();
-                    });
+                return promise_t([this,
+                                on_fulfilled = std::forward<FuncFulfilled>(on_fulfilled)](promise_t npm) {
+                    gen_on_fulfilled(std::move(on_fulfilled), npm)();
+                });
                 case State::Rejected:
-                    return promise_t([this, on_rejected](promise_t npm) {
-                        gen_on_rejected(on_rejected, npm)();
-                    });
+                return promise_t([this,
+                                on_rejected = std::forward<FuncRejected>(on_rejected)](promise_t npm) {
+                    gen_on_rejected(std::move(on_rejected), npm)();
+                });
                 default: PROMISE_ERR_INVALID_STATE;
             }
         }
 
         template<typename FuncFulfilled>
-        promise_t then(FuncFulfilled on_fulfilled) {
+        promise_t then(FuncFulfilled &&on_fulfilled) {
             switch (state)
             {
                 case State::Pending:
-                    return promise_t([this, on_fulfilled](promise_t npm) {
-                        add_on_fulfilled(gen_on_fulfilled(on_fulfilled, npm));
-                        add_on_rejected([this, npm]() {npm->reject(reason);});
-                    });
+                return promise_t([this,
+                                on_fulfilled = std::forward<FuncFulfilled>(on_fulfilled)](promise_t npm) {
+                    add_on_fulfilled(gen_on_fulfilled(std::move(on_fulfilled), npm));
+                    add_on_rejected([this, npm]() {npm->reject(reason);});
+                });
                 case State::Fulfilled:
-                    return promise_t([this, on_fulfilled](promise_t npm) {
-                        gen_on_fulfilled(on_fulfilled, npm)();
-                    });
+                return promise_t([this,
+                                on_fulfilled = std::forward<FuncFulfilled>(on_fulfilled)](promise_t npm) {
+                    gen_on_fulfilled(std::move(on_fulfilled), npm)();
+                });
                 case State::Rejected:
-                    return promise_t([this](promise_t npm) {npm->reject(reason);});
+                return promise_t([this](promise_t npm) {npm->reject(reason);});
                 default: PROMISE_ERR_INVALID_STATE;
             }
         }
  
         template<typename FuncRejected>
-        promise_t fail(FuncRejected on_rejected) {
+        promise_t fail(FuncRejected &&on_rejected) {
             switch (state)
             {
                 case State::Pending:
-                    return promise_t([this, on_rejected](promise_t npm) {
-                        callback_t ret;
-                        add_on_rejected(gen_on_rejected(on_rejected, npm));
-                        add_on_fulfilled([this, npm]() {npm->resolve(result);});
-                    });
+                return promise_t([this,
+                                on_rejected = std::forward<FuncRejected>(on_rejected)](promise_t npm) {
+                    callback_t ret;
+                    add_on_rejected(gen_on_rejected(std::move(on_rejected), npm));
+                    add_on_fulfilled([this, npm]() {npm->resolve(result);});
+                });
                 case State::Fulfilled:
-                    return promise_t([this](promise_t npm) {npm->resolve(result);});
+                return promise_t([this](promise_t npm) {npm->resolve(result);});
                 case State::Rejected:
-                    return promise_t([this, on_rejected](promise_t npm) {
-                        gen_on_rejected(on_rejected, npm)();
-                    });
+                return promise_t([this,
+                                on_rejected = std::forward<FuncRejected>(on_rejected)](promise_t npm) {
+                    gen_on_rejected(std::move(on_rejected), npm)();
+                });
                 default: PROMISE_ERR_INVALID_STATE;
             }
         }
@@ -483,7 +495,7 @@ namespace promise {
         typename function_traits<Func>::non_empty_arg * = nullptr>
     constexpr auto gen_any_callback(Func f) {
         using func_t = callback_types<Func>;
-        return [f](pm_any_t v) mutable {
+        return [f = std::forward<Func>(f)](pm_any_t v) mutable {
             try {
                 f(any_cast<typename func_t::arg_type>(v));
             } catch (bad_any_cast &e) { PROMISE_ERR_MISMATCH_TYPE; }
@@ -495,13 +507,13 @@ namespace promise {
         typename enable_if_return<Func, void>::type * = nullptr,
         typename function_traits<Func>::non_empty_arg * = nullptr>
     constexpr auto gen_any_callback(Func f) {
-        return [f](pm_any_t v) mutable {f(v);};
+        return [f = std::forward<Func>(f)](pm_any_t v) mutable {f(v);};
     }
 
     template<typename Func,
         typename enable_if_return<Func, void>::type * = nullptr,
         typename function_traits<Func>::empty_arg * = nullptr>
-    constexpr auto gen_any_callback(Func f) { return f; }
+    constexpr auto gen_any_callback(Func f) { return std::forward<Func>(f); }
 
     template<typename Func,
         typename enable_if_arg<Func, pm_any_t>::type * = nullptr,
@@ -509,7 +521,7 @@ namespace promise {
         typename function_traits<Func>::non_empty_arg * = nullptr>
     constexpr auto gen_any_callback(Func f) {
         using func_t = callback_types<Func>;
-        return [f](pm_any_t v) mutable {
+        return [f = std::forward<Func>(f)](pm_any_t v) mutable {
             return typename func_t::ret_type(f(v));
         };
     }
@@ -520,7 +532,7 @@ namespace promise {
         typename function_traits<Func>::non_empty_arg * = nullptr>
     constexpr auto gen_any_callback(Func f) {
         using func_t = callback_types<Func>;
-        return [f](pm_any_t v) mutable {
+        return [f = std::forward<Func>(f)](pm_any_t v) mutable {
             try {
                 return typename func_t::ret_type(
                     f(any_cast<typename func_t::arg_type>(v)));
@@ -533,26 +545,26 @@ namespace promise {
         typename function_traits<Func>::empty_arg * = nullptr>
     constexpr auto gen_any_callback(Func f) {
         using func_t = callback_types<Func>;
-        return [f]() mutable {
+        return [f = std::forward<Func>(f)]() mutable {
             return typename func_t::ret_type(f());
         };
     }
 
     template<typename FuncFulfilled>
     inline promise_t promise_t::then(FuncFulfilled on_fulfilled) const {
-        return (*this)->then(gen_any_callback(on_fulfilled));
+        return (*this)->then(gen_any_callback(std::forward<FuncFulfilled>(on_fulfilled)));
     }
 
     template<typename FuncFulfilled, typename FuncRejected>
     inline promise_t promise_t::then(FuncFulfilled on_fulfilled,
                                     FuncRejected on_rejected) const {
-        return (*this)->then(gen_any_callback(on_fulfilled),
-                            gen_any_callback(on_rejected));
+        return (*this)->then(gen_any_callback(std::forward<FuncFulfilled>(on_fulfilled)),
+                            gen_any_callback(std::forward<FuncRejected>(on_rejected)));
     }
 
     template<typename FuncRejected>
     inline promise_t promise_t::fail(FuncRejected on_rejected) const {
-        return (*this)->fail(gen_any_callback(on_rejected));
+        return (*this)->fail(gen_any_callback(std::forward<FuncRejected>(on_rejected)));
     }
 }
 
