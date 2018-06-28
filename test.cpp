@@ -30,6 +30,21 @@ promise_t g(int x) {
     return promise_t([](promise_t pm) {pm.resolve(1);});
 }
 
+void test_fac() {
+    promise_t root;
+    promise_t t = root;
+    for (int i = 0; i < 10; i++)
+        t = t.then([](std::pair<int, int> p) {
+            p.first *= p.second;
+            p.second++;
+            return p;
+        });
+    t.then([](std::pair<int, int> p) {
+        printf("fac(%d) = %d\n", p.second, p.first);
+    });
+    root.resolve(std::make_pair(1, 1));
+}
+
 int main() {
     callback_t t1;
     callback_t t2;
@@ -143,4 +158,5 @@ int main() {
     t1();
     puts("calling t2: resolve the second half of promise 1 (promise 2)");
     t2();
+    test_fac();
 }

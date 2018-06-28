@@ -14,6 +14,35 @@ the underlying `any` type, an exception will be thrown when the resolved value
 types do not match the types expected in the subsequent computation. See
 `test.cpp` for detailed examples.
 
+Example
+=======
+
+Calculate the factorial of n, the hard way:
+
+.. code-block:: cpp
+
+   #include "promise.hpp"
+   
+   using promise::promise_t;
+   
+   int main() {
+       promise_t root;
+       promise_t t = root;
+       for (int i = 0; i < 10; i++)
+           t = t.then([](std::pair<int, int> p) {
+               p.first *= p.second;
+               p.second++;
+               return p;
+           });
+       t.then([](std::pair<int, int> p) {
+           printf("fac(%d) = %d\n", p.second, p.first);
+       });
+       /* no actual calculation until here */
+       root.resolve(std::make_pair(1, 1));
+       return 0;
+   }
+    
+
 API
 ===
 
