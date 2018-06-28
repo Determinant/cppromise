@@ -40,7 +40,7 @@ void test_fac() {
             return p;
         });
     t.then([](std::pair<int, int> p) {
-        printf("fac(%d) = %d\n", p.second, p.first);
+        printf("fac(%d) = %d\n", p.second - 1, p.first);
     });
     root.resolve(std::make_pair(1, 1));
 }
