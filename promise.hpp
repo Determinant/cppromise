@@ -184,13 +184,13 @@ namespace promise {
         template<typename PList> friend promise_t race(const PList &promise_list);
         std::vector<callback_t> fulfilled_callbacks;
         std::vector<callback_t> rejected_callbacks;
-#ifndef CPPROMISE_USE_STACK
+#ifdef CPPROMISE_USE_STACK_FREE
         std::vector<Promise *> fulfilled_pms;
         std::vector<Promise *> rejected_pms;
 #endif
         enum class State {
             Pending,
-#ifndef CPPROMISE_USE_STACK
+#ifdef CPPROMISE_USE_STACK_FREE
             PreFulfilled,
             PreRejected,
 #endif
@@ -213,7 +213,7 @@ namespace promise {
         static constexpr auto cps_transform(
                 Func f, const pm_any_t &result, const promise_t &npm) {
             return [&result, npm, f = std::forward<Func>(f)]() mutable {
-#ifdef CPPROMISE_USE_STACK
+#ifndef CPPROMISE_USE_STACK_FREE
                 f(result)->then(
                     [npm] (pm_any_t result) {npm->resolve(result);},
                     [npm] (pm_any_t reason) {npm->reject(reason);});
@@ -237,7 +237,7 @@ namespace promise {
         static constexpr auto cps_transform(
                 Func f, const pm_any_t &, const promise_t &npm) {
             return [npm, f = std::forward<Func>(f)]() mutable {
-#ifdef CPPROMISE_USE_STACK
+#ifndef CPPROMISE_USE_STACK_FREE
                 f()->then(
                     [npm] (pm_any_t result) {npm->resolve(result);},
                     [npm] (pm_any_t reason) {npm->reject(reason);});
@@ -349,7 +349,7 @@ namespace promise {
             };
         }
 
-#ifndef CPPROMISE_USE_STACK
+#ifdef CPPROMISE_USE_STACK_FREE
         void _trigger() {
             std::stack<std::tuple<
                 std::vector<Promise *>::const_iterator,
@@ -474,7 +474,7 @@ namespace promise {
                                 ](promise_t &npm) {
                     add_on_fulfilled(gen_on_fulfilled(std::move(on_fulfilled), npm));
                     add_on_rejected(gen_on_rejected(std::move(on_rejected), npm));
-#ifndef CPPROMISE_USE_STACK
+#ifdef CPPROMISE_USE_STACK_FREE
                     _dep_resolve(npm);
                     _dep_reject(npm);
 #endif
@@ -505,7 +505,7 @@ namespace promise {
                                 ](promise_t &npm) {
                     add_on_fulfilled(gen_on_fulfilled(std::move(on_fulfilled), npm));
                     add_on_rejected([this, npm]() {npm->_reject(reason);});
-#ifndef CPPROMISE_USE_STACK
+#ifdef CPPROMISE_USE_STACK_FREE
                     _dep_resolve(npm);
                     _dep_reject(npm);
 #endif
@@ -533,7 +533,7 @@ namespace promise {
                     callback_t ret;
                     add_on_rejected(gen_on_rejected(std::move(on_rejected), npm));
                     add_on_fulfilled([this, npm]() {npm->_resolve(result);});
-#ifndef CPPROMISE_USE_STACK
+#ifdef CPPROMISE_USE_STACK_FREE
                     _dep_resolve(npm);
                     _dep_reject(npm);
 #endif
@@ -590,7 +590,7 @@ namespace promise {
                             npm->_resolve(*results);
                     },
                     [npm](pm_any_t reason) {npm->_reject(reason);});
-#ifndef CPPROMISE_USE_STACK
+#ifdef CPPROMISE_USE_STACK_FREE
                 pm->_dep_resolve(npm);
                 pm->_dep_reject(npm);
 #endif
@@ -604,7 +604,7 @@ namespace promise {
             for (const auto &pm: promise_list) {
                 pm->then([npm](pm_any_t result) {npm->_resolve(result);},
                         [npm](pm_any_t reason) {npm->_reject(reason);});
-#ifndef CPPROMISE_USE_STACK
+#ifdef CPPROMISE_USE_STACK_FREE
                 pm->_dep_resolve(npm);
                 pm->_dep_reject(npm);
 #endif
