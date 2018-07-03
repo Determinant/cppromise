@@ -46,6 +46,10 @@ matrix:
             - clang-3.6
       env:
         - MATRIX_EVAL="CC=clang-3.6 && CXX=clang++-3.6"
+      script:
+        - make test14 test14_stack_free
+        - ./test14 | diff - test_ref.txt
+        - ./test14_stack_free | diff - test_ref.txt
 
     - os: linux
       addons:
