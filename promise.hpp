@@ -126,21 +126,35 @@ namespace promise {
     class promise_t {
         Promise *pm;
         size_t *ref_cnt;
-        inline void clear();
         public:
         friend Promise;
         template<typename PList> friend promise_t all(const PList &promise_list);
         template<typename PList> friend promise_t race(const PList &promise_list);
 
         inline promise_t();
+        inline ~promise_t();
         template<typename Func> inline promise_t(Func callback);
-        ~promise_t() { clear(); }
+
+        void swap(promise_t &other) {
+            std::swap(pm, other.pm);
+            std::swap(ref_cnt, other.ref_cnt);
+        }
 
         promise_t &operator=(const promise_t &other) {
-            clear();
-            pm = other.pm;
-            ref_cnt = other.ref_cnt;
-            ++*ref_cnt;
+            if (this != &other)
+            {
+                promise_t tmp(other);
+                tmp.swap(*this);
+            }
+            return *this;
+        }
+
+        promise_t &operator=(promise_t &&other) {
+            if (this != &other)
+            {
+                promise_t tmp(std::move(other));
+                tmp.swap(*this);
+            }
             return *this;
         }
 
@@ -623,7 +637,7 @@ namespace promise {
         pm(new Promise()),
         ref_cnt(new size_t(1)) {}
 
-    inline void promise_t::clear() {
+    inline promise_t::~promise_t() {
         if (pm)
         {
             if (--*ref_cnt) return;
