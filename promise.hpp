@@ -636,7 +636,7 @@ namespace promise {
         });
     }
 
-    template<typename Func, disable_if_same_ref<Func, promise_t> * = nullptr>
+    template<typename Func, disable_if_same_ref<Func, promise_t> *>
     inline promise_t::promise_t(Func &&callback):
             pm(new Promise()),
         ref_cnt(new size_t(1)) {
